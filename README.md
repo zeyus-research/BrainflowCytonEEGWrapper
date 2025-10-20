@@ -47,6 +47,24 @@ Default channels coming in with cyton and daisy with the ultracortex mk4 are:
 
 ## Installation
 
+This package requires portaudio to be installed on your system.
+
+On macOS, you can install it via Homebrew:
+
+```bash
+brew install portaudio
+```
+
+On Ubuntu/Debian, you can install it via apt:
+
+```bash
+sudo apt-get install portaudio19-dev
+```
+
+On Windows, it should be installed alongside the package.
+
+Then, you can install the package via pip:
+
 ```bash
 pip install BrainflowCyton
 ```
@@ -214,4 +232,3 @@ This project uses GitHub Actions for continuous integration and deployment:
 ## License
 
 MIT License - see LICENSE file for details
-

@@ -1,6 +1,6 @@
 [project]
 name = "BrainflowCyton"
-version = "0.2.0"
+version = "0.2.1"
 description = "Python wrapper for BrainFlow API + Cyton SDK for collecting realtime or offline (SDCard) EEG, EMG, EKG data."
 readme = "README.md"
 requires-python = ">=3.9"
