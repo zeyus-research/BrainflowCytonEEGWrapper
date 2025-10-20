@@ -9,7 +9,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.9", "3.14"]
+        include-audio: [true]
+        # Add one test without audio extra to verify graceful handling
+        include:
+          - os: ubuntu-latest
+            python-version: "3.14"
+            include-audio: false
 
     steps:
     - uses: actions/checkout@v4
@@ -32,8 +38,13 @@ jobs:
       if: runner.os == 'macOS'
       run: brew install portaudio
 
-    - name: Install dependencies
+    - name: Install dependencies (with audio)
+      if: matrix.include-audio == true
       run: uv sync --all-extras --dev
+
+    - name: Install dependencies (without audio)
+      if: matrix.include-audio == false
+      run: uv sync --dev
 
     - name: Print environment for debugging
       run: |

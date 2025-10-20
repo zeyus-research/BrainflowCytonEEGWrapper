@@ -10,6 +10,7 @@ from BrainflowCyton.eeg import (
     CytonInputType,
     CytonCommand,
     Filtering,
+    HAS_SOUNDDEVICE,
 )
 
 
@@ -128,3 +129,46 @@ class TestLogging:
         # Should not raise exception
         EEG.configure_logging(level=logging.DEBUG)
         EEG.configure_logging(level=logging.INFO)
+
+
+class TestAudioOptional:
+    """Test Audio class handles missing sounddevice gracefully."""
+
+    def test_audio_import(self):
+        """Test that Audio class can be imported even without sounddevice."""
+        from BrainflowCyton.eeg import Audio, HAS_SOUNDDEVICE
+        # Should be able to import regardless
+        assert Audio is not None
+
+    def test_audio_play_without_sounddevice(self):
+        """Test that Audio.play raises helpful error when sounddevice missing."""
+        from BrainflowCyton.eeg import Audio, HAS_SOUNDDEVICE
+        import numpy as np
+
+        if not HAS_SOUNDDEVICE:
+            # Should raise ImportError with helpful message
+            with pytest.raises(ImportError, match="sounddevice is required"):
+                Audio.play(np.array([0.1, 0.2, 0.3]))
+        else:
+            # If sounddevice is installed, skip this specific test
+            pytest.skip("sounddevice is installed")
+
+    def test_audio_non_play_methods_work(self):
+        """Test that Audio methods not requiring sounddevice still work."""
+        from BrainflowCyton.eeg import Audio
+        import numpy as np
+
+        # These should work regardless of sounddevice
+        data = np.random.randn(100)
+
+        # Test smooth
+        smoothed = Audio.smooth(data)
+        assert smoothed.shape == data.shape
+
+        # Test filter_savitzky_golay
+        filtered = Audio.filter_savitzky_golay(data)
+        assert filtered.shape == data.shape
+
+        # Test resample
+        resampled = Audio.resample(data, sr_in=250, sr_out=500)
+        assert len(resampled) > 0

@@ -1,16 +1,22 @@
 from enum import Enum
 import time
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from numpy.typing import NDArray
 import numpy as np
 from scipy.signal import savgol_filter
-import sounddevice as sd
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 from brainflow.data_filter import DataFilter, FilterTypes, NoiseTypes
 import samplerate
 import pyxdf
 import pandas as pd
 import logging
+
+# Optional sounddevice import for Audio class
+try:
+    import sounddevice as sd
+    HAS_SOUNDDEVICE = True
+except ImportError:
+    HAS_SOUNDDEVICE = False
 
 class CytonSampleRate(Enum):
   SR_250 = 6
@@ -244,7 +250,7 @@ class EEG(object):
     self.board.prepare_session()
     self.is_prepared = True
 
-  def start_stream(self, sdcard = True, sr: CytonSampleRate|None = None, duration_max: int = 120, use_markers: bool = True) -> None:
+  def start_stream(self, sdcard = True, sr: Optional[CytonSampleRate] = None, duration_max: int = 120, use_markers: bool = True) -> None:
     """
     Starts recording EEG data either to sd card or via dongle
     defaults to 120 minutes for SDCard recording
@@ -479,7 +485,7 @@ class EEG(object):
     self.board = BoardShim(self.board_id, self.params)
     self.update_speed_ms = 50
 
-  def poll(self, clear = True) -> NDArray[np.float64] | None:
+  def poll(self, clear = True) -> Optional[NDArray[np.float64]]:
     """
     Gets latest data from the board.
     If clear is True, the ringbuffer is emptied.
@@ -597,9 +603,22 @@ class Filtering(object):
     return data
 
 class Audio(object):
+  """Audio utilities for EEG sonification.
+
+  Note: Requires sounddevice package. Install with: pip install BrainflowCyton[audio]
+  """
   middle_c: float = 261.63
   pcm_sr: int = 44100
   attenuate: float = 0.2
+
+  @staticmethod
+  def _check_sounddevice() -> None:
+    """Check if sounddevice is available."""
+    if not HAS_SOUNDDEVICE:
+      raise ImportError(
+        "sounddevice is required for Audio functionality. "
+        "Install it with: pip install BrainflowCyton[audio]"
+      )
 
   @staticmethod
   def scale_eeg_to_pcm_amp(x: NDArray[np.float64], out_range=(-32767, 32767)) -> NDArray[np.float64]:
@@ -608,14 +627,20 @@ class Audio(object):
     return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
 
   @staticmethod
-  def resample(x: NDArray[np.float64], sr_in: int, sr_out: int|None = None) -> NDArray[np.float64]:
+  def resample(x: NDArray[np.float64], sr_in: int, sr_out: Optional[int] = None) -> NDArray[np.float64]:
     if sr_out is None:
       sr_out = Audio.pcm_sr
     return np.interp(np.arange(0, len(x), sr_in / sr_out), np.arange(0, len(x)), x)
 
   @staticmethod
   def play(x: NDArray[np.float64]) -> None:
-    sd.play(x * Audio.attenuate, Audio.pcm_sr)
+    """Play audio data.
+
+    Raises:
+      ImportError: If sounddevice is not installed
+    """
+    Audio._check_sounddevice()
+    sd.play(x * Audio.attenuate, Audio.pcm_sr)  # type: ignore
     time.sleep(len(x) / Audio.pcm_sr)
 
   @staticmethod

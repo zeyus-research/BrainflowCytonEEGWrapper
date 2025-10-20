@@ -47,27 +47,31 @@ Default channels coming in with cyton and daisy with the ultracortex mk4 are:
 
 ## Installation
 
-This package requires portaudio to be installed on your system.
+```bash
+pip install BrainflowCyton
+```
 
-On macOS, you can install it via Homebrew:
+### Optional: Audio Utilities
 
+If you want to use the Audio class for EEG sonification, install with the `audio` extra:
+
+```bash
+pip install BrainflowCyton[audio]
+```
+
+This requires PortAudio to be installed on your system:
+
+**macOS:**
 ```bash
 brew install portaudio
 ```
 
-On Ubuntu/Debian, you can install it via apt:
-
+**Ubuntu/Debian:**
 ```bash
 sudo apt-get install portaudio19-dev
 ```
 
-On Windows, it should be installed alongside the package.
-
-Then, you can install the package via pip:
-
-```bash
-pip install BrainflowCyton
-```
+**Windows:** PortAudio should be installed automatically with the package.
 
 Or for development:
 

@@ -1,9 +1,19 @@
 # Changelog
 
+## [0.2.2] - 2025-10-20
+
+### Changed
+- Made `sounddevice` an optional dependency (install with `pip install BrainflowCyton[audio]`)
+- Audio class now raises helpful ImportError when sounddevice is not installed
+
+### Fixed
+- Python 3.9 compatibility: Replaced `|` union syntax with `Optional` for type hints
+
 ## [0.2.1] - 2025-10-20
 
 ### Fixed
-- Fixed github runners to include portaudio
+- Fixed GitHub Actions runners to include PortAudio
+- Added PortAudio installation instructions to README
 
 ## [0.2.0] - 2025-10-20
 

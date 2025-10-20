@@ -1,6 +1,6 @@
 [project]
 name = "BrainflowCyton"
-version = "0.2.1"
+version = "0.2.2"
 description = "Python wrapper for BrainFlow API + Cyton SDK for collecting realtime or offline (SDCard) EEG, EMG, EKG data."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -30,10 +30,17 @@ dependencies = [
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "scipy>=1.10.0",
-    "sounddevice>=0.4.6",
     "brainflow>=5.0.0",
     "samplerate>=0.2.0",
     "pyxdf>=1.16.0",
+]
+
+[project.optional-dependencies]
+audio = [
+    "sounddevice>=0.4.6",
+]
+all = [
+    "sounddevice>=0.4.6",
 ]
 
 [project.urls]
