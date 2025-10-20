@@ -1,7 +1,7 @@
 from enum import Enum
 import time
 from typing import List, Tuple
-from nptyping import NDArray, Float64
+from numpy.typing import NDArray
 import numpy as np
 from scipy.signal import savgol_filter
 import sounddevice as sd
@@ -26,13 +26,18 @@ class CytonSampleRate(Enum):
     """
     Send in value e.g. 3, and get sample rate back in Hz (2000)
     """
-    return __class__._value2member_map_[value].to_hz()
+    member = CytonSampleRate._value2member_map_[value]
+    if (type(member) != CytonSampleRate):
+      # this should never happen, but fixes the mypy error
+      raise ValueError(f"Invalid CytonSampleRate value: {value}")
+
+    return member.to_hz()
   
-  def to_hz(cls) -> int:
+  def to_hz(self) -> int:
     """
     Converts a CytonSampleRate to Hz
     """
-    return int(str(cls.name)[3:])
+    return int(str(self.name)[3:])
 
 class CytonInputType(Enum):
   ADSINPUT_NORMAL = 0
@@ -103,6 +108,7 @@ class CytonRecordingDuration(Enum):
       return cls.MIN_1440
     elif required_mb >= 1500:
       raise ValueError(f"Can't record for {max_duration_mins} minutes with {sr}Hz sampling rate, requires more than 1.5Gb of SD card memory")
+    raise ValueError("Unable to determine recording duration block")
 
 class CytonChannel(Enum):
   CH_1 = 1
@@ -203,10 +209,22 @@ class CytonBoardMode(Enum):
 class EEG(object):
   sdcard = False
   is_prepared = False
+
+  @staticmethod
+  def configure_logging(level: int = logging.INFO, format: str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s') -> None:
+    """
+    Configure logging for BrainflowCyton library.
+
+    Args:
+      level: Logging level (e.g., logging.INFO, logging.DEBUG)
+      format: Log message format string
+    """
+    logging.basicConfig(level=level, format=format)
+
   def __init__(self, dummyBoard: bool = False, emg_channels: List[int] = [], serial_port: str = 'COM3', window_size: int = 4) -> None:
     self.params = BrainFlowInputParams()
     self.serial_port = serial_port
-    self.curves = []
+    # self.curves: np.ndarray = []
     self.dummyBoard = dummyBoard
     if(dummyBoard):
       self._prepare_dummy_board()
@@ -226,7 +244,7 @@ class EEG(object):
     self.board.prepare_session()
     self.is_prepared = True
 
-  def start_stream(self, sdcard = True, sr: CytonSampleRate = None, duration_max: int = 120, use_markers: bool = True) -> None:
+  def start_stream(self, sdcard = True, sr: CytonSampleRate|None = None, duration_max: int = 120, use_markers: bool = True) -> None:
     """
     Starts recording EEG data either to sd card or via dongle
     defaults to 120 minutes for SDCard recording
@@ -288,7 +306,7 @@ class EEG(object):
     """
     for channel in self.emg_channels:
       ch = CytonChannel.from_channel_number(channel)
-      result = self._channel_config(ch, disable=False, gain=CytonGain.GAIN_24, input_type=CytonInputType.ADSINPUT_NORMAL, bias=True, srb1=False, srb2=False)
+      self._channel_config(ch, disable=False, gain=CytonGain.GAIN_24, input_type=CytonInputType.ADSINPUT_NORMAL, bias=True, srb1=False, srb2=False)
 
     return True
 
@@ -300,16 +318,40 @@ class EEG(object):
 
   def disable_channel(self, channel: int) -> bool:
     """
-    Disables a channel
+    Disables a channel.
+
+    Args:
+      channel: Channel number (1-16)
+
+    Returns:
+      True if successful
+
+    Raises:
+      ValueError: If channel number is not between 1 and 16
     """
+    if not 1 <= channel <= 16:
+      raise ValueError(f"Channel must be between 1 and 16, got: {channel}")
+
     ch = CytonCommand.channel_number_off(channel)
     self._send_command(ch.value)
     return True
 
   def enable_channel(self, channel: int) -> bool:
     """
-    Enables a channel
+    Enables a channel.
+
+    Args:
+      channel: Channel number (1-16)
+
+    Returns:
+      True if successful
+
+    Raises:
+      ValueError: If channel number is not between 1 and 16
     """
+    if not 1 <= channel <= 16:
+      raise ValueError(f"Channel must be between 1 and 16, got: {channel}")
+
     ch = CytonCommand.channel_number_on(channel)
     self._send_command(ch.value)
     return True
@@ -437,43 +479,84 @@ class EEG(object):
     self.board = BoardShim(self.board_id, self.params)
     self.update_speed_ms = 50
 
-  def poll(self, clear = True) -> NDArray[Float64]:
+  def poll(self, clear = True) -> NDArray[np.float64] | None:
     """
-    Gets latest data from the board
-    if clear is True, the ringbuffer is emptied
+    Gets latest data from the board.
+    If clear is True, the ringbuffer is emptied.
+
+    Returns:
+      NDArray if data is available, None if using SD card mode (data must be retrieved from SD card)
+
+    Raises:
+      RuntimeError: If board session is not prepared
     """
+    if not self.is_prepared:
+      raise RuntimeError("Board session not prepared. Call prepare() or use context manager.")
+
     if self.sdcard and not self.dummyBoard:
+      logging.warning("poll() returns None in SD card mode. Data must be retrieved from the SD card.")
       return None
+
     if clear:
       return self.board.get_board_data(self.num_points)
     else:
       return self.board.get_current_board_data(self.num_points)
     
-  def tag(self, tag:str) -> None:
+  def tag(self, tag: str) -> None:
     """
-    Tags the current sample with a char
+    Tags the current sample with a char.
 
     Args:
-      tag: char to tag the sample with, can be any char e.g. 'a', 'b', 'c', '1', '2', '3'
+      tag: Single character to tag the sample with, e.g. 'a', 'b', 'c', '1', '2', '3'
+
+    Raises:
+      ValueError: If tag is not a single character
+      RuntimeError: If board session is not prepared
     """
+    if not self.is_prepared:
+      raise RuntimeError("Board session not prepared. Call prepare() or use context manager.")
+
+    if not isinstance(tag, str) or len(tag) != 1:
+      raise ValueError(f"Tag must be a single character, got: {tag!r}")
+
     if self.sdcard and not self.dummyBoard:
-      self._send_command('{}{}'.format(CytonCommand.MARKER_PREFIX.value, tag))
+      self._send_command(f'{CytonCommand.MARKER_PREFIX.value}{tag}')
     else:
-      # use wrapper to tag the sample
-      self.board.insert_marker(tag)
+      # BrainFlow's insert_marker expects a float, so convert char to ASCII code
+      self.board.insert_marker(float(ord(tag)))
 
   def stop(self) -> None:
     """
-    Stops streaming (if streaming) and disconnects board session
+    Stops streaming (if streaming) and disconnects board session.
+    Safe to call multiple times.
     """
     if self.is_prepared:
-      if self.sdcard:
-        self._stop_sd_recording()
-      else:
-        self.board.stop_stream()
-      self.board.release_session()
-      self.is_prepared = False
+      try:
+        if self.sdcard:
+          self._stop_sd_recording()
+        else:
+          self.board.stop_stream()
+        self.board.release_session()
+      except Exception as e:
+        logging.error(f"Error while stopping board: {e}")
+      finally:
+        self.is_prepared = False
   
+  def __enter__(self):
+    """
+    Context manager entry: prepare the board session.
+    """
+    if not self.is_prepared:
+      self.prepare()
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: ARG002
+    """
+    Context manager exit: clean up resources.
+    """
+    self.stop()
+    return False
+
   def __del__(self) -> None:
     """
     Destructor: Always try to disconnect the board.
@@ -486,14 +569,14 @@ class Filtering(object):
     self.sampling_rate = sampling_rate
     self.converter = 'sinc_best' # or 'sinc_fastest'
 
-  def butterworth_lowpass(self, data: NDArray[Float64], cutoff = 49.0) -> NDArray[Float64]:
+  def butterworth_lowpass(self, data: NDArray[np.float64], cutoff = 49.0) -> NDArray[np.float64]:
     for _, channel in enumerate(self.exg_channels):
       # DataFilter.detrend(data[channel], DetrendOperations.CONSTANT.value)
       DataFilter.perform_lowpass(data[channel], self.sampling_rate, cutoff, 2,
           FilterTypes.BUTTERWORTH.value, 0)
     return data
   
-  def bandpass(self, data: NDArray[Float64], lowcut = 1.0, highcut = 49.0, order = 3) -> NDArray[Float64]:
+  def bandpass(self, data: NDArray[np.float64], lowcut = 1.0, highcut = 49.0, order = 3) -> NDArray[np.float64]:
     c_freq = lowcut + ((highcut - lowcut) / 2)
     bw = (highcut - lowcut)
     for _, channel in enumerate(self.exg_channels):
@@ -501,14 +584,14 @@ class Filtering(object):
           FilterTypes.BUTTERWORTH.value, 0)
     return data
 
-  def resample(self, data: NDArray[Float64], new_rate: int) -> NDArray[Float64]:
+  def resample(self, data: NDArray[np.float64], new_rate: int) -> NDArray[np.float64]:
     """
     Note, brainflow data must be transformed...
     """
     return samplerate.resample(data, new_rate / self.sampling_rate, self.converter)
     
 
-  def filter_50hz(self, data: NDArray[Float64]) -> NDArray[Float64]:
+  def filter_50hz(self, data: NDArray[np.float64]) -> NDArray[np.float64]:
     for _, channel in enumerate(self.exg_channels):
       DataFilter.remove_environmental_noise(data[channel], self.sampling_rate, NoiseTypes.FIFTY.value)
     return data
@@ -518,30 +601,36 @@ class Audio(object):
   pcm_sr: int = 44100
   attenuate: float = 0.2
 
-  def scale_eeg_to_pcm_amp(x: NDArray[Float64], out_range=(-32767, 32767)) -> NDArray[Float64]:
+  @staticmethod
+  def scale_eeg_to_pcm_amp(x: NDArray[np.float64], out_range=(-32767, 32767)) -> NDArray[np.float64]:
     domain = np.min(x), np.max(x)
     y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
     return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
-  
-  def resample(x: NDArray[Float64], sr_in: int, sr_out: int = None) -> NDArray[Float64]:
+
+  @staticmethod
+  def resample(x: NDArray[np.float64], sr_in: int, sr_out: int|None = None) -> NDArray[np.float64]:
     if sr_out is None:
       sr_out = Audio.pcm_sr
     return np.interp(np.arange(0, len(x), sr_in / sr_out), np.arange(0, len(x)), x)
 
-  def play(x: NDArray[Float64]) -> None:
+  @staticmethod
+  def play(x: NDArray[np.float64]) -> None:
     sd.play(x * Audio.attenuate, Audio.pcm_sr)
     time.sleep(len(x) / Audio.pcm_sr)
-  
-  def smooth(x: NDArray[Float64]) -> NDArray[Float64]:
+
+  @staticmethod
+  def smooth(x: NDArray[np.float64]) -> NDArray[np.float64]:
     return np.convolve(x, np.ones(5), 'same') / 5
 
-  def filter_savitzky_golay(x: NDArray[Float64], window_size: int = 5, order: int = 2) -> NDArray[Float64]:
+  @staticmethod
+  def filter_savitzky_golay(x: NDArray[np.float64], window_size: int = 5, order: int = 2) -> NDArray[np.float64]:
     return savgol_filter(x, window_size, order)
 
 class EEGReader(object):
+  @staticmethod
   def parse_obci_header(file: str) -> Tuple[dict, int]:
     skip = 0
-    headers = {}
+    headers: dict[str, int|str] = {}
     with open(file, 'rt') as f:
       for line in f:
         if not line.startswith("%"):
@@ -555,13 +644,16 @@ class EEGReader(object):
           headers["board"] = line.split("=")[1].strip()
     return headers, skip
 
+  @staticmethod
   def read_openbci_txt(file: str) -> Tuple[pd.DataFrame, dict]:
     headers, skip = EEGReader.parse_obci_header(file)
     return pd.read_csv(file, sep=',', header=skip), headers
 
+  @staticmethod
   def read_xdf(file: str) -> Tuple[List[dict], dict]:
     return pyxdf.load_xdf(file)
 
 class EEGWriter(object):
+  @staticmethod
   def write_xdf(file: str, data: List[dict], headers: dict) -> None:
     pyxdf.save_xdf(file, data, headers)
