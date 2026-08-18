@@ -3,7 +3,7 @@ name = "BrainflowCyton"
 version = "0.2.2"
 description = "Python wrapper for BrainFlow API + Cyton SDK for collecting realtime or offline (SDCard) EEG, EMG, EKG data."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
     { name = "zeyus", email = "dev@zeyus.com" }
@@ -17,10 +17,11 @@ classifiers = [
     "Operating System :: OS Independent",
     "Natural Language :: English",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Human Machine Interfaces",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: System :: Hardware",
