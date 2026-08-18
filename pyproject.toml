@@ -37,10 +37,10 @@ dependencies = [
 
 [project.optional-dependencies]
 audio = [
-    "sounddevice>=0.4.6",
+    "sounddevice>=0.5.6",
 ]
 all = [
-    "sounddevice>=0.4.6",
+    "sounddevice>=0.5.6",
 ]
 
 [project.urls]
@@ -54,14 +54,14 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "pytest>=7.0.0",
+    "pytest>=7.1.1",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["BrainflowCyton"]
 
 [tool.pytest.ini_options]
-minversion = "7.0"
+minversion = "9.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
 
