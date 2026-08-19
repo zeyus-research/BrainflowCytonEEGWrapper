@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.3.0] - 2025-10-20
+
+- Breaking change. All dependencies updated, minimum Python version is now 3.12
+
 ## [0.2.2] - 2025-10-20
 
 ### Changed
