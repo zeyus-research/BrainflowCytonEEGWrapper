@@ -32,7 +32,7 @@ dependencies = [
     "brainflow>=5.22.2",
     "samplerate>=0.2.4",
     "pyxdf>=1.17.5",
-    "setuptools==84.0.0",
+    "setuptools==84.2.1",
 ]
 
 [project.optional-dependencies]
