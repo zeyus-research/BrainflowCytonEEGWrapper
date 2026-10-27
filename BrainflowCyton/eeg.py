@@ -1,5 +1,7 @@
 import logging
+import struct
 import time
+import xml.etree.ElementTree as ET
 from enum import Enum
 
 import numpy as np
@@ -125,7 +127,7 @@ class CytonRecordingDuration(Enum):
             return cls.MIN_1440
         elif required_mb >= 1500:
             raise ValueError(
-                f"Can't record for {max_duration_mins} minutes with {sr}Hz sampling rate, "
+                f"Can't record for {max_duration_mins} minutes with {sr.to_hz()}Hz sampling rate, "
                 "requires more than 1.5Gb of SD card memory"
             )
         raise ValueError("Unable to determine recording duration block")
@@ -326,7 +328,7 @@ class EEG:
         self.sdcard = True
         if sr is None:
             sr = CytonSampleRate.SR_1000
-            self._set_sample_rate(sr)
+        self._set_sample_rate(sr)
 
         # if we get here it's a real board
         # and sdcard is True
@@ -713,7 +715,104 @@ class EEGReader:
         return pyxdf.load_xdf(file)
 
 
+# XDF channel_format -> little-endian numpy dtype
+_XDF_DTYPES: dict[str, str] = {
+    "int8": "<i1",
+    "int16": "<i2",
+    "int32": "<i4",
+    "int64": "<i8",
+    "float32": "<f4",
+    "double64": "<f8",
+}
+
+# Keys pyxdf.load_xdf adds to stream["info"] that are not part of the XDF stream header
+_PYXDF_INFO_KEYS = {"stream_id", "effective_srate", "segments", "clock_segments"}
+
+
 class EEGWriter:
     @staticmethod
-    def write_xdf(file: str, data: list[dict], headers: dict) -> None:
-        pyxdf.save_xdf(file, data, headers)
+    def write_xdf(file: str, data: list[dict], headers: dict | None = None) -> None:
+        """
+        Writes streams to an XDF file (https://github.com/sccn/xdf/wiki/Specifications).
+
+        Takes the same structure that EEGReader.read_xdf (pyxdf.load_xdf) returns, so
+        ``EEGWriter.write_xdf(path, *EEGReader.read_xdf(other_path))`` round-trips a file.
+
+        Each stream is a dict with:
+          info: header fields as lists, e.g. {"name": ["EEG"], "type": ["EEG"], "channel_count": ["8"],
+                "nominal_srate": ["250"], "channel_format": ["float32"], "desc": [None]}
+          time_series: (n_samples, n_channels) array, or list of lists of str for "string" streams
+          time_stamps: (n_samples,) array of timestamps in seconds
+          footer: optional, written as-is if present
+
+        Timestamps are written as given and no ClockOffset chunks are written, so data
+        loaded with clock synchronization enabled stays synchronized.
+        """
+        if headers is None:
+            headers = {"info": {"version": ["1.0"]}}
+        with open(file, "wb") as f:
+            f.write(b"XDF:")
+            f.write(EEGWriter._chunk(1, EEGWriter._xml(headers)))
+            for stream_id, stream in enumerate(data, start=1):
+                info = {k: v for k, v in stream["info"].items() if k not in _PYXDF_INFO_KEYS}
+                sid = struct.pack("<I", stream_id)
+                f.write(EEGWriter._chunk(2, sid + EEGWriter._xml({"info": info})))
+                stamps = np.asarray(stream["time_stamps"], dtype=np.float64)
+                if len(stamps) > 0:
+                    samples = EEGWriter._samples(info["channel_format"][0], stream["time_series"], stamps)
+                    f.write(EEGWriter._chunk(3, sid + samples))
+                footer = stream.get("footer") or EEGWriter._footer(stamps)
+                f.write(EEGWriter._chunk(6, sid + EEGWriter._xml(footer)))
+
+    @staticmethod
+    def _varlen_int(n: int) -> bytes:
+        if n < 2**8:
+            return struct.pack("<BB", 1, n)
+        if n < 2**32:
+            return struct.pack("<BI", 4, n)
+        return struct.pack("<BQ", 8, n)
+
+    @staticmethod
+    def _chunk(tag: int, content: bytes) -> bytes:
+        # [NumLengthBytes][Length][Tag][Content], Length covers Tag + Content
+        return EEGWriter._varlen_int(len(content) + 2) + struct.pack("<H", tag) + content
+
+    @staticmethod
+    def _xml(d: dict) -> bytes:
+        """Inverse of pyxdf's _xml2dict: {tag: text | None | {child: [values]}}"""
+
+        def build(el: ET.Element, value: object) -> None:
+            if isinstance(value, dict):
+                for key, values in value.items():
+                    for v in values:
+                        build(ET.SubElement(el, key), v)
+            elif value is not None:
+                el.text = str(value)
+
+        ((tag, value),) = d.items()
+        root = ET.Element(tag)
+        build(root, value)
+        return b'<?xml version="1.0"?>' + ET.tostring(root, encoding="utf-8", xml_declaration=False)
+
+    @staticmethod
+    def _samples(channel_format: str, time_series: NDArray | list, stamps: NDArray[np.float64]) -> bytes:
+        out = [EEGWriter._varlen_int(len(stamps))]
+        if channel_format == "string":
+            for stamp, sample in zip(stamps, time_series, strict=True):
+                out.append(b"\x08" + struct.pack("<d", stamp))
+                for value in sample:
+                    raw = str(value).encode("utf-8")
+                    out.append(EEGWriter._varlen_int(len(raw)) + raw)
+        else:
+            values = np.asarray(time_series, dtype=_XDF_DTYPES[channel_format])
+            for stamp, sample in zip(stamps, values, strict=True):
+                out.append(b"\x08" + struct.pack("<d", stamp) + sample.tobytes())
+        return b"".join(out)
+
+    @staticmethod
+    def _footer(stamps: NDArray[np.float64]) -> dict:
+        info: dict[str, list] = {"sample_count": [str(len(stamps))]}
+        if len(stamps) > 0:
+            info["first_timestamp"] = [repr(float(stamps[0]))]
+            info["last_timestamp"] = [repr(float(stamps[-1]))]
+        return {"info": info}
