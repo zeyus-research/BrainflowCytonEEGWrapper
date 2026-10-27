@@ -48,6 +48,14 @@ uv run pytest tests/test_eeg.py::TestEEGDummyBoard::test_initialization
 - Add docstrings to public methods
 - Keep lines under 120 characters
 
+Formatting, linting and type checking are configured in `pyproject.toml` and enforced in CI:
+
+```bash
+uv run ruff format .        # format
+uv run ruff check --fix .   # lint (and auto-fix where possible)
+uv run mypy                 # type check
+```
+
 ## Release Process
 
 Releases are automated via GitHub Actions:

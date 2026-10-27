@@ -1,16 +1,17 @@
 """Tests for EEG class using dummy board."""
+
 import time
+
 import numpy as np
 import pytest
+
 from BrainflowCyton.eeg import (
     EEG,
-    CytonSampleRate,
-    CytonChannel,
-    CytonGain,
-    CytonInputType,
-    CytonCommand,
-    Filtering,
     HAS_SOUNDDEVICE,
+    CytonChannel,
+    CytonCommand,
+    CytonSampleRate,
+    Filtering,
 )
 
 
@@ -56,8 +57,8 @@ class TestEEGDummyBoard:
             eeg.start_stream(sdcard=False)
             time.sleep(0.2)
             # Should not raise exception
-            eeg.tag('A')
-            eeg.tag('1')
+            eeg.tag("A")
+            eeg.tag("1")
 
 
 class TestEnums:
@@ -126,6 +127,7 @@ class TestLogging:
     def test_configure_logging(self):
         """Test logging configuration method."""
         import logging
+
         # Should not raise exception
         EEG.configure_logging(level=logging.DEBUG)
         EEG.configure_logging(level=logging.INFO)
@@ -136,14 +138,16 @@ class TestAudioOptional:
 
     def test_audio_import(self):
         """Test that Audio class can be imported even without sounddevice."""
-        from BrainflowCyton.eeg import Audio, HAS_SOUNDDEVICE
+        from BrainflowCyton.eeg import Audio
+
         # Should be able to import regardless
         assert Audio is not None
 
     def test_audio_play_without_sounddevice(self):
         """Test that Audio.play raises helpful error when sounddevice missing."""
-        from BrainflowCyton.eeg import Audio, HAS_SOUNDDEVICE
         import numpy as np
+
+        from BrainflowCyton.eeg import Audio
 
         if not HAS_SOUNDDEVICE:
             # Should raise ImportError with helpful message
@@ -155,8 +159,9 @@ class TestAudioOptional:
 
     def test_audio_non_play_methods_work(self):
         """Test that Audio methods not requiring sounddevice still work."""
-        from BrainflowCyton.eeg import Audio
         import numpy as np
+
+        from BrainflowCyton.eeg import Audio
 
         # These should work regardless of sounddevice
         data = np.random.randn(100)

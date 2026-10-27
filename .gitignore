@@ -44,3 +44,6 @@ uv.lock
 
 # Development files (uncomment if you want to ignore)
 # main.py
+
+# Ruff cache
+.ruff_cache/

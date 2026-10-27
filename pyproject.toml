@@ -54,11 +54,41 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "mypy>=2.4.0",
+    "pandas-stubs>=3.0.5.260914",
     "pytest>=7.1.1",
+    "ruff>=0.17.3",
+    "scipy-stubs>=1.18.1.1",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["BrainflowCyton"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific
+]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["BrainflowCyton", "tests"]
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+# No type information published for these
+module = ["brainflow.*", "samplerate", "pyxdf", "sounddevice"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "9.0"

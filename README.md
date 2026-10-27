@@ -141,15 +141,14 @@ from BrainflowCyton.eeg import EEG
 from time import sleep
 
 eeg_source = EEG()
-eeg_source.start_stream(sdcard = False)
+eeg_source.start_stream(sdcard=False)
 
 while True:
-  try:
-    sleep(0.5)
-    data = eeg_source.poll()
-  except KeyboardInterrupt:
-    eeg_source.stop()
-  
+    try:
+        sleep(0.5)
+        data = eeg_source.poll()
+    except KeyboardInterrupt:
+        eeg_source.stop()
 ```
 
 ### Set a custom sample rate
@@ -161,15 +160,14 @@ from BrainflowCyton.eeg import EEG, CytonSampleRate
 from time import sleep
 
 eeg_source = EEG()
-eeg_source.start_stream(sdcard = True, sr = CytonSampleRate.SR_1000)
+eeg_source.start_stream(sdcard=True, sr=CytonSampleRate.SR_1000)
 
 while True:
-  try:
-    sleep(0.5)
-    data = eeg_source.poll()
-  except KeyboardInterrupt:
-    eeg_source.stop()
-  
+    try:
+        sleep(0.5)
+        data = eeg_source.poll()
+    except KeyboardInterrupt:
+        eeg_source.stop()
 ```
 
 ### Enable logging
