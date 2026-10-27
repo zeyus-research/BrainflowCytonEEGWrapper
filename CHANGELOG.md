@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.1] - 2026-10-27
+
+- Updated the uv lock file with the package version
+
 ## [0.4.0] - 2026-10-27
 
 - Update CI to do linting and type checking
