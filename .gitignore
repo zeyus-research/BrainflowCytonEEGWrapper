@@ -39,8 +39,6 @@ dmypy.json
 # Python version management
 .python-version
 
-# UV lock file (keep or remove based on preference)
-uv.lock
 
 # Development files (uncomment if you want to ignore)
 # main.py
