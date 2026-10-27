@@ -1,6 +1,13 @@
 # Changelog
 
-## [0.3.0] - 2025-10-20
+## [0.4.0] - 2026-10-27
+
+- Update CI to do linting and type checking
+- Fix XDF file writing
+- Fix a sample rate issue on start_stream
+- Added tests for EEGReader and EEGWriter classes
+
+## [0.3.0] - 2026-08-19
 
 - Breaking change. All dependencies updated, minimum Python version is now 3.12
 
